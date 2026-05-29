@@ -61,7 +61,40 @@ def describe_splits(n_samples, n_blocks=8, n_test_blocks=2, embargo=5):
     avg_test = np.mean([len(te) for _, te in splits])
     print(f"Avg train size: {avg_train:.0f}, avg test size: {avg_test:.0f}")
 
+def get_cpcv_splits(
+    n_samples,
+    n_blocks=8,
+    n_test_blocks=2,
+    embargo=5,
+    label_span=1,
+):
+    """Yield (train_idx, test_idx) for every combination of test blocks.
 
+    label_span: how many days forward the label depends on. The direction
+    label spans 1 day; the 5-day forward-vol target spans 5. Training rows
+    whose [t, t+label_span] window overlaps a test block are purged, so a
+    larger span widens the purge accordingly.
+    """
+    indices = np.arange(n_samples)
+    block_bounds = np.array_split(indices, n_blocks)
+
+    for test_combo in combinations(range(n_blocks), n_test_blocks):
+        test_idx = np.concatenate([block_bounds[b] for b in test_combo])
+        test_idx_set = set(test_idx.tolist())
+
+        excluded = set()
+        for b in test_combo:
+            block = block_bounds[b]
+            start, end = block[0], block[-1]
+            lo = max(0, start - embargo - label_span)
+            hi = min(n_samples - 1, end + embargo)
+            excluded.update(range(lo, hi + 1))
+
+        train_idx = np.array(
+            [i for i in indices if i not in test_idx_set and i not in excluded]
+        )
+        yield train_idx, np.sort(test_idx)
+        
 if __name__ == "__main__":
     df = pd.read_parquet("data/processed/features.parquet")
     describe_splits(len(df))
