@@ -5,6 +5,7 @@ from src.eval import run_cpcv, summarize
 from src.models.naive import fit_predict_prior
 from src.models.logit import fit_predict_logit
 from src.models.lgbm import fit_predict_lgbm
+from src.models.lstm_nf import fit_predict_lstm
 
 FEATURES_PATH = Path("data/processed/features.parquet")
 ARTIFACTS = Path("artifacts")
@@ -22,6 +23,7 @@ def main():
         ("naive", fit_predict_prior),
         ("logit", fit_predict_logit),
         ("lgbm", fit_predict_lgbm),
+        ("lstm", fit_predict_lstm),
     ]
     for name, fn in models:
         print(f"Running {name}...")
