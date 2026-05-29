@@ -73,38 +73,29 @@ def test_label_balance_sane(full_features):
 def test_no_nans_in_processed(full_features):
     assert not full_features.isna().any().any()
 
-def test_vol_target_excludes_current_day():
-    """The forward-vol target at row t must NOT include day t's own return."""
-    from src.features_vol import build_vol_features, VOL_HORIZON
+def test_vol_target_forward_window():
+    """Target at row t must equal close-to-close vol over days t+1..t+FWD_WINDOW."""
+    from src.features_vol import build_vol_features, FWD_WINDOW
+    import numpy as np
     raw = load_raw()
     vol = build_vol_features(raw)
 
-    # Recompute what the target SHOULD be using only future days, independently
-    import numpy as np
     r = raw.sort_values("date").reset_index(drop=True).copy()
     r["logret"] = np.log(r["close"] / r["close"].shift(1))
 
-    # For a sample row, the target should equal std of logret[t+1 .. t+VOL_HORIZON]
-    merged = vol[["date", "y"]].merge(
-        r[["date", "logret"]].reset_index(), on="date"
-    ).sort_values("index").reset_index(drop=True)
-
-    # Check a handful of interior rows
     for pos in [50, 200, 400, 600]:
-        if pos + VOL_HORIZON >= len(r):
+        if pos + FWD_WINDOW >= len(r):
             continue
-        future_rets = r["logret"].iloc[pos + 1: pos + 1 + VOL_HORIZON]
-        expected = future_rets.std() * np.sqrt(252)
         target_date = r["date"].iloc[pos]
+        future = r["logret"].iloc[pos + 1: pos + 1 + FWD_WINDOW]
+        expected = future.std() * np.sqrt(252)
         actual_row = vol.loc[vol["date"] == target_date, "y"]
         if len(actual_row) == 0:
             continue
         actual = actual_row.values[0]
         assert abs(expected - actual) < 1e-6, (
-            f"Vol target at pos {pos} mismatch: expected {expected:.6f}, "
-            f"got {actual:.6f}. Target may include day t or wrong window."
+            f"Vol target at pos {pos}: expected {expected:.6f}, got {actual:.6f}"
         )
-
 
 def test_vol_purge_wider_than_direction():
     """A 5-day label span must purge more training rows than a 1-day span."""
