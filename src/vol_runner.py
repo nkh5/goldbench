@@ -4,6 +4,12 @@ from pathlib import Path
 from src.eval import run_cpcv_regression, summarize_regression
 from src.models.garch import fit_predict_garch
 from src.models.persistence import fit_predict_persistence
+from src.models.persistence import fit_predict_persistence
+from src.models.garch import fit_predict_garch
+from src.models.reg_model import (
+    fit_predict_ridge, fit_predict_lgbm_reg,
+    fit_predict_lstm_reg, 
+)
 
 VOL_FEATURES_PATH = Path("data/processed/features_vol.parquet")
 ARTIFACTS = Path("artifacts")
@@ -20,6 +26,9 @@ def main():
     models = [
         ("persistence", fit_predict_persistence),
         ("garch", fit_predict_garch),
+        ("ridge", fit_predict_ridge),
+        ("lgbm_reg", fit_predict_lgbm_reg),
+        ("lstm_reg", fit_predict_lstm_reg),
     ]
     for name, fn in models:
         print(f"Running {name}...")
