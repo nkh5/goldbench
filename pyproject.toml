@@ -14,6 +14,7 @@ dependencies = [
     "onnx>=1.21.0",
     "onnxmltools>=1.16.0",
     "onnxruntime>=1.26.0",
+    "onnxscript>=0.7.0",
     "pandas==2.2.3",
     "plotly>=5.24.1",
     "pyarrow>=24.0.0",
@@ -26,6 +27,7 @@ dependencies = [
     "streamlit==1.45.1",
     "streamlit-shap>=1.0.2",
     "timeseriescv==0.2",
+    "torch>=2.11.0",
     "vectorbt==0.27.2",
 ]
 

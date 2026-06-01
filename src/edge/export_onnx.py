@@ -72,21 +72,15 @@ def main():
         _ = sess.run(out_names, {input_name: X_te_np})
     onnx_time = (time.perf_counter() - t0) / 100 * 1000
 
+    # Verify ONNX predictions match native (sanity: export didn't corrupt the model)
     native_pred = model.predict_proba(X_te_np)[:, 1]
-    onnx_out = sess.run(out_names, {input_name: X_te_np})
-    # Probability output is a list of dicts or a 2D array depending on version
-    raw = onnx_out[0]
-    if isinstance(raw, list):  # list of {0: p0, 1: p1} dicts
+    raw = sess.run(out_names, {input_name: X_te_np})[0]
+    if isinstance(raw, list):          # zipmap=True path: list of {0: p0, 1: p1} dicts
         onnx_pred = np.array([d[1] for d in raw])
-    else:
-        onnx_pred = np.array(raw)[:, 1] if np.array(raw).ndim == 2 else np.array(raw).ravel()
-    max_diff = np.max(np.abs(native_pred - onnx_pred[:len(native_pred)]))
-    
-    # Verify ONNX predictions match native (sanity: export didn't corrupt model)
-    native_pred = model.predict_proba(X_te_np)[:, 1]
-    onnx_out = sess.run(None, {input_name: X_te_np})
-    onnx_pred = np.array(onnx_out[1])[:, 1] if len(onnx_out) > 1 else np.array(onnx_out[0]).ravel()
-    max_diff = np.max(np.abs(native_pred - onnx_pred[:len(native_pred)]))
+    else:                              # zipmap=False path: plain (N, 2) array
+        arr = np.asarray(raw)
+        onnx_pred = arr[:, 1] if arr.ndim == 2 else arr.ravel()
+    max_diff = np.max(np.abs(native_pred - onnx_pred))
 
     print("=== Edge Baseline Benchmark ===")
     print(f"Native LightGBM size: {native_size/1024:.1f} KB")
