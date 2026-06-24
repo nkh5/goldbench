@@ -2,14 +2,15 @@
 
 A reproducible benchmark testing whether model complexity helps when forecasting
 gold futures (GC=F) on daily data. Five model families are compared across two
-targets, one essentially unforecastable (next day direction) and one genuinely
-forecastable (short horizon volatility), under leakage controlled combinatorial
-purged cross validation. The project then compresses the trained models for edge
-deployment and measures the size, speed, and accuracy tradeoff.
+targets, one genuinely forecastable (short horizon volatility) and one essentially
+unforecastable (next day direction), using leakage controlled combinatorial purged
+cross validation. The project then compresses the trained models for edge deployment
+and measures the size, speed, and accuracy tradeoff.
 
 **Central finding:** on low signal financial data, simple models match or beat
-complex ones on both targets. The real skill is knowing which questions are
-answerable.
+complex ones on both targets.
+
+**The data** Roughly 1,150 daily observations of GC=F (gold futures) OHLCV, plus engineered technical indicators. One instrument, daily frequency. This is small by machine learning standards and severely small for deep learning, which is itself part of the story.
 
 ## Why this project exists
 
@@ -22,32 +23,9 @@ statistically humble results if it did not."
 
 ## Results
 
-### Direction track: predict next day up or down
-
-Five models predict whether tomorrow's close will be higher than today's, scored by
-AUC (the primary metric, since it is unaffected by class imbalance) across 28
-combinatorial purged cross validation splits.
-
-| Model | AUC (mean) | AUC std | Accuracy | Brier | Note |
-|---|---|---|---|---|---|
-| naive | 0.500 | 0.000 | 0.558 | 0.247 | floor: always predicts the base rate |
-| logistic | 0.515 | 0.024 | 0.543 | 0.251 | only model above random AUC |
-| LightGBM | 0.484 | 0.029 | 0.548 | 0.249 | overfit below random (21 of 28 folds under 0.50) |
-| LSTM | 0.494 | 0.015 | 0.537 | 0.287 | near random, lowest variance |
-| PatchTST | 0.506 | 0.018 | 0.494 | 0.332 | target only (channel independent), barely above random |
-
-**Reading it:** the simplest model that uses features (logistic regression) is the
-only one that meaningfully beats the random baseline. Both high capacity models
-(LightGBM and the LSTM) land at or below a coin flip out of sample, and the modern
-transformer barely clears random from price action alone. The naive baseline is
-right 55.8 percent of the time simply because gold rose over this period, so any
-model bragging about "54 percent accuracy" is in fact losing to a model that does no
-work. This is the bias variance tradeoff and weak form market efficiency, measured
-directly rather than assumed.
-
 ### Volatility track: predict short horizon realized volatility
 
-The same model families (plus a classical GARCH baseline) predict next period
+Five model families (including a classical GARCH baseline) predict next period
 realized volatility, a continuous target. Because volatility clusters, this target
 is genuinely forecastable, unlike direction. Scored by rank correlation and QLIKE
 (the volatility literature's preferred metrics); R squared is omitted deliberately
@@ -57,17 +35,37 @@ is genuinely forecastable, unlike direction. Scored by rank correlation and QLIK
 |---|---|---|---|---|
 | persistence | 0.198 | 0.112 | 32.07 | naive baseline: tomorrow looks like recently |
 | GARCH | 0.267 | 0.098 | -2.65 | classical model, clearly beats persistence |
-| ridge | 0.276 | 0.095 | -2.35 | best on every metric |
+| ridge | 0.276 | 0.095 | -2.35 | best on correlation and RMSE; GARCH wins QLIKE |
 | LightGBM | 0.123 | 0.106 | -2.16 | overfit, same pattern as direction track |
-| LSTM | unstable | varies | large | median fold correlation 0.000; 6 of 28 folds negative |
+| LSTM | 0.146 (0.000 median) | 0.278 | ~3.3e13 | unstable: 9 of 28 folds degenerate to undefined corr |
 
-**Reading it:** here the models work. Ridge regression (the simple linear model
-again) wins, narrowly beating the classical GARCH model, and both clearly beat the
-naive persistence baseline. The pattern from the direction track repeats: the high
-capacity models fail, with LightGBM overfitting and the LSTM unstable (it scored a
-strong 0.467 correlation in one fold but a median of zero across all 28, evidence of
-an overparameterized model on insufficient data). PatchTST was attempted and cut: it
-produced inverted forecasts on this target.
+**Reading it:** Ridge regression (the simple linear model) posts the best correlation
+and RMSE, narrowly ahead of the classical GARCH model, while GARCH takes the best
+QLIKE, and both clearly beat the naive persistence baseline. The high capacity models
+fail, a pattern that recurs on the direction track: LightGBM overfits, and the LSTM
+is unstable (its 0.146 mean correlation is lifted by a single 0.467 fold over a
+median of zero, with 9 of 28 folds degenerate, and its RMSE 0.278 and QLIKE near 3e13
+make it the worst model despite that mean, evidence of an overparameterized model on
+insufficient data).
+
+### Direction track: predict next day up or down
+
+Five models predict whether tomorrow's close will be higher than today's, scored by
+AUC across 28 combinatorial purged cross validation splits.
+
+| Model | AUC (mean) | AUC std | Accuracy | Brier | Note |
+|---|---|---|---|---|---|
+| naive | 0.500 | 0.000 | 0.558 | 0.247 | Baseline |
+| logistic | 0.515 | 0.024 | 0.543 | 0.251 | Highest AUC |
+| LightGBM | 0.484 | 0.029 | 0.548 | 0.249 | Overfit below random (21 of 28 folds under 0.50) |
+| LSTM | 0.494 | 0.015 | 0.537 | 0.287 | Near random, lowest variance |
+| PatchTST | 0.506 | 0.018 | 0.494 | 0.332 | Target only, barely above random |
+
+**Reading it:** the simplest model that uses features (logistic regression) is the
+only one that meaningfully beats the random baseline. Both high capacity models
+(LightGBM and the LSTM) land at or below a coin flip out of sample, and the modern
+transformer barely clears random from price action alone. This is the bias variance tradeoff and weak form market efficiency, measured
+directly rather than assumed.
 
 ### Edge deployment: model compression
 
@@ -102,7 +100,7 @@ splits, not a single point estimate.
 sklearn Pipelines), every rolling feature uses only past data, and a unit test
 poisons all future rows with NaN, recomputes features, and asserts past features are
 unchanged. The cross validation purge widens automatically with the label's forward
-horizon.
+horizon (3 days for the volatility target, 1 day for direction).
 
 **Metric choice for volatility.** R squared is omitted from the volatility results on
 purpose. It grades against each fold's shifting mean, punishes conservatively scaled
