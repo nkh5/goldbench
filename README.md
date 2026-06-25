@@ -75,8 +75,8 @@ that drives on device deployment.
 | Experiment | Size | Latency | Accuracy | Insight |
 |---|---|---|---|---|
 | LightGBM to ONNX | 34 percent smaller | 2.8x faster | identical predictions | ONNX runtime is faster than native LightGBM |
-| LightGBM INT8 quantization | unchanged | unchanged | identical (0.00000 shift) | trees are structure, not weights, so quantization does nothing |
 | LSTM INT8 quantization | 32 percent smaller | no CPU speedup | AUC change -0.0009 | neural nets are weight heavy, so quantization compresses; speed benefit is hardware dependent |
+| LightGBM INT8 quantization | unchanged | unchanged | identical (0.00000 shift) | trees are structure, not weights, so quantization does nothing |
 
 **Reading it:** quantization compressed the weight heavy LSTM by roughly a third with
 negligible accuracy loss (AUC moved 0.0009), but left the tree model byte for byte
